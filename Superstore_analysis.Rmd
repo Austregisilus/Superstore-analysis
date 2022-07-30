@@ -1,0 +1,223 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Introduction
+
+This project was done alongside the Tableau assignment in order to practice some R programming with exploratory data analysis. The data set used is the full superstore data containing information on there sales, profit and other metrics of their stores around the United States of America. We want to find out if the discount policy employed is beneficial or detrimental to the sales of items.
+
+***
+
+## Import pacakges for the assignment
+
+Libraries used for our little project. Although as we move the project will add more libraries.
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggeasy)
+```
+
+***
+
+## Extract, transform and load
+
+Read the excel file containing the data that we are going to explore then move to tableau and create a story.
+
+```{r}
+df <- readxl::read_xlsx("Full-Sales-Superstore-Dataset.xlsx")
+head(df)
+```
+
+Look at the data more.
+
+```{r}
+str(df)
+```
+
+Generate a summary of the data.
+
+```{r}
+summary(df)
+```
+
+After looking at the summary of the data we see that the data has no missing values plus the data type seems to be correct. The only problem may be that the data has mixed case (uppercase or lowercase) and the column headers might need to also be change to make it easier to deal with.
+Below we shall change the column header to make calling the header columns easier later on.
+
+```{r}
+names(df)
+```
+
+Now we implement the changes mentioned above and print the results below the code cell.
+
+```{r}
+names(df) <- tolower(names(df))
+names(df) <- gsub(" ","_", names(df),)
+names(df) <- sub("-","_", names(df),)
+names(df)
+```
+
+Explore the first 5 rows of the superstore dataset.
+
+```{r}
+head(df)
+```
+
+# Exploratory analysis
+
+The questions we are going to address is how the discount affect the sales of sub-category items and the profit ratio.
+
+Create a dataframe of the sub-category item with sales, discount, profit and profit_ratio. View the first 5 rows of the new dataframe.
+
+```{r}
+data_sub <- df %>% select(sub_category, sales, discount, profit, profit_ratio)
+head(data_sub)
+```
+
+Look at the total sum of sales for each sub-category plus the profit ratio.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarise(Total_sales = sum(sales), Total_profit_ratio = sum(profit_ratio),Total_discount = sum(discount), Total_profit = sum(profit)) %>% arrange(desc(Total_sales))
+```
+
+Will have to change some of the data types to factors so as to simplify the visualization done below.
+
+```{r}
+data_sub$sub_category <- as.factor(data_sub$sub_category)
+```
+
+
+Visualize the total sales from largest to smallest.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarise(Total_Sales = sum(sales)) %>% ggplot(aes(x = Total_Sales, y = reorder(sub_category, Total_Sales ), fill = Total_Sales)) + geom_col() + labs(x = 'Sub-Category', subtitle = 'The sum of sales for each sub-category',y = 'Sales', title = 'Bar Chart of Sub-category') + theme_classic() + theme(legend.position = 'none', plot.title = element_text(size = 15), axis.text.x = element_blank()) + geom_text(aes(label = prettyNum(Total_Sales, big.mark = ",")), size = 3, hjust = -.1, vjust = .1) + scale_x_continuous(limits = c(0,400000)) + scale_fill_gradient(low = "light blue", high = "blue")
+```
+
+The bar chart above shows that Phones are making the highest sales and Fasteners are in last place. 
+
+Next we look at the data in terms of profit.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarise(Total_Profit = sum(profit)) %>% ggplot(aes(x = Total_Profit, y = reorder(sub_category, Total_Profit ), fill = Total_Profit)) + geom_col() + labs(x = 'Sub-Category', subtitle = 'The sum of profits for each sub-category',y = 'Profits', title = 'Bar Chart of Sub-category and Profits')+ theme_classic() + theme(legend.position = 'none', plot.title = element_text(size = 15)) + scale_fill_gradient(low = "red" ,high = "green")
+```
+
+From the above, in terms of profit, copiers generate the most profit and tables actually lose money. We shall examine the data from the profit ratio $sum(profit)/sum(sales)$.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarise(Total_Profit_Ratio = sum(profit_ratio)) %>% ggplot(aes(x = Total_Profit_Ratio, y = reorder(sub_category, Total_Profit_Ratio ), fill = Total_Profit_Ratio)) + geom_col() + labs(x = 'Sub-Category', subtitle = 'The sum of Profit ratio for each sub-category',y = 'Profit ratio', title = 'Bar Chart of Sub-category and Profit ratio') + theme_classic() + theme(legend.position = 'none', plot.title = element_text(size = 15)) + scale_fill_gradient(low = "red", high = "green")
+```
+
+The above shows the profit ratio of the various sub-category items. Paper leads with the highest profit ratio and blinders have the lowest profit ratio.
+
+From the above, we shall make the sales bar graph with the profit ratio to show how the sub-category is doing in terms of profit.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarise(Total_Sales = sum(sales), Total_Profit_Ratio = sum(profit_ratio)) %>% ggplot(aes(x = Total_Sales, y = reorder(sub_category, Total_Sales ), fill = Total_Profit_Ratio)) + geom_col() + labs(x = 'Sub-Category', subtitle = 'The sum of sales for each sub-category with the profit ratio',y = 'Sales', title = 'Bar Chart of Sub-category') + theme_classic() + theme(plot.title = element_text(size = 15), axis.text.x = element_blank()) + geom_text(aes(label = prettyNum(Total_Sales, big.mark = ",")), size = 3, hjust = -.1, vjust = .1) + scale_x_continuous(limits = c(0,400000)) + scale_fill_gradient(low = "light blue", high = "blue") + easy_add_legend_title("Profit ratio")
+
+```
+
+From the above, paper which has a high profit ratio in terms of sales ranks low compared to binders that has a low profit ratio.
+
+Let see how much discount binders has compared to the other sub-categories. We shall use a pie chart to illustrate this.
+
+```{r}
+ data_sub %>% group_by(sub_category) %>% summarise(Percent_discount = (sum(discount)/sum(data_sub$discount)*100)) %>% ggplot(aes(x = "", y = Percent_discount, fill = sub_category)) + geom_bar(position = "fill", stat="identity", color = "white") + coord_polar("y", start=0) + labs(title = "Pie chart of the Discount") + theme_void() + easy_add_legend_title("Sub category")
+```
+
+The pie chart clearly shows the discount of binders is greater than the rest. This is the reason that the profit ratio is the lowest from the bar chart.
+
+After this we shall use a correlation matrix and scatter plot to identify any correlation that may exist between discount and the other attributes that we are experimenting on. An important note to mention is that correlation does not imply causation.
+
+```{r}
+library(corrplot)
+num_data <- data_sub %>% select(-sub_category)
+m <- cor(num_data)
+corrplot(m, method = 'number', col = COL2('RdYlBu'), title = "Correlation matrix")
+```
+
+From the corrplot, we can see that there is a strong negative correlation between Profit ratio and discount (-0.86). We also see that there is a weak strong correlation between profit and sales (0.48) and a weak negative correlation between profit and discount. 
+
+Now we shall construct a scatterplot of sum of the profit ratio and discount to get a more indepth insight.
+
+```{r}
+data_sub %>% group_by(sub_category) %>% summarize(Total_Profit_Ratio = sum(profit_ratio), Total_discount = sum(discount), Total_sales = sum(sales)) %>% ggplot() + geom_point(aes(y = Total_Profit_Ratio, x = Total_discount, color = sub_category, size = Total_sales)) + theme_classic() + labs(title = "Scatterplot of Discount and Profit ratio", y = "Profit ratio", x = "Discount", subtitle = "Comparing Discount and Profit ratio of different sub-category sales", color = "black") + easy_add_legend_title("Sub-category") + scale_size(guide = "none")
+```
+
+From the scatterplot, we can see that for binders the discount is high therefore the profit ratio is negative. The company may need to re-evaluate the discount for binders.
+Lastly we construct a treemap to have a bird"s eye view of the sales.
+
+```{r}
+library(treemap)
+library(d3treeR)
+tre <- df %>% select(category, sub_category, sales, discount)
+p <- treemap(tre ,index = c("category", "sub_category"), vSize = "sales", vColor = "discount", type = "value", title = "Treemap of sales")
+inter <- d3tree2(p, rootname = "Category")
+inter
+```
+
+The treemap show that the office suppiles are highly discounted compared to the other categories mainly because of blinders.
+
+# Conclusion
+
+Blinders seem to be doing good for sales but are highly discounted. The store may require to remove the discount on blinder to generate more profit.
+
+# Machine learning
+
+We want to use random tree regression to predict our profit and also gain insight on what features are important for the profit attribute.
+
+From the whole dataset, I will remove meaningless attributes such as customer name that will not be used by the algorithm.
+
+```{r}
+regress <- df %>% select(-customer_name, -country, -postal_code, -city, -product_name, -number_of_records, -order_id, -segment, -ship_mode)
+head(regress)
+```
+
+Split the data into test and train datasets.
+
+```{r}
+library(caret)
+set.seed(25)
+partition <- caret::createDataPartition(regress$profit, p = 0.75, list = FALSE)
+data_train <- regress[partition,]
+data_test <- regress[-partition,]
+```
+
+After splitting the data, we use the random forest algorithm to run a regression model on the data.
+
+```{r}
+library(randomForest)
+
+set.seed(38)
+rf.fit <- randomForest(profit ~ ., data = data_train, importance = TRUE)
+rf.fit
+```
+
+Display a graph of mean squared error based on the number of trees used.
+
+```{r}
+plot(rf.fit)
+```
+
+Now we attempt to evaluate the random forest algorithm. First we find the smallest mean squared error produced by the algorithm.
+
+```{r}
+which.min(rf.fit$mse)
+sqrt(rf.fit$mse[which.min(rf.fit$mse)]) 
+```
+
+Construct a plot showing the importance of the predictor variable.
+
+```{r}
+varImpPlot(rf.fit)
+```
+
+Show the figures used to construct the figure above.
+
+```{r}
+rfvar <- varImp(rf.fit, scale = TRUE) %>% arrange(desc(Overall))
+rfvar
+```
+
